@@ -13,6 +13,6 @@ Usage
 
 Run the python script with the .lcd input file as the argument:
 ```
->python lcdtocarray.py input.lcd
+$ python lcdtocarray.py input.lcd
 ```
 The output file will be saved in the active directory with the name "{font-name}_{font-width}x{font-height}.c".
