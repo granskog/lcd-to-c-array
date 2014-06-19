@@ -8,7 +8,7 @@
 
 # The MIT License (MIT)
 
-# Copyright (c) 2014 David Gran Skog
+# Copyright (c) 2014 David Gran Skog, http://www.granskog.com
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
