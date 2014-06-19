@@ -11,8 +11,5 @@ The script was created for use together with AVR microcontroller and a Nokia LCD
 Usage
 ==============
 
-Run the python script with the .lcd input file as the argument:
-```
-$ python lcdtocarray.py input.lcd
-```
+Run the python script with the .lcd input file as the argument: `$ python lcdtocarray.py input.lcd`.
 The output file will be saved in the active directory with the name "{font-name}_{font-width}x{font-height}.c".
