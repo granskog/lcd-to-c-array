@@ -56,7 +56,8 @@ _CFONTSTART = """/*
  * Font size (width:height): {width:d}:{height:d} pixels
  * Start char:               0x{fromChar:2x}
  * End char:                 0x{toChar:2x}
- * Generated with MikroElektronika GLCD Font Creator (http://www.mikroe.com/glcd-font-creator/) & lcdtocarray.py (www.granskog.com)
+ * Font data generated with: MikroElektronika GLCD Font Creator (http://www.mikroe.com/glcd-font-creator/)
+ * C formatting generated with: lcdtocarray.py (https://github.com/granskog/lcd-to-c-array)
 */
 static const uint8_t {name:s}_{width:d}x{height:d}[] PROGMEM =
 {{
@@ -207,14 +208,14 @@ Options:
     -m              Most significant bit first in bitmap. Default is LSB.
     -z              Horizontal byte order of array in output file. This is the default.
     -v              Vertical byte order of array in output file. Default is horizontal byte order."""
-
-if __name__ == '__main__':
+    
+def main(argv):
     inputfile = ''
     outputfile = ''
     hbyteorder = True
     lsb = True
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hi:o:lmzv",["help, LSB, MSB"])
+        opts, args = getopt.getopt(argv, "hi:o:lmzv",["help, LSB, MSB"])
     except getopt.GetoptError:
         print _USAGE
         sys.exit(2)
@@ -245,3 +246,6 @@ if __name__ == '__main__':
     if saveAsCHeader(inputfile, outputfile, lsb, hbyteorder) != 0:
         print _lastErrStr
         sys.exit(2);
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
