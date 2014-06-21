@@ -13,7 +13,7 @@ Usage
 
 Run the python script with the .lcd input file as the argument:
 ```
-$ lcdtocarray.py [options] input_file
+$ python lcdtocarray.py [options] input_file
 
 Options:
     -i input_file   Specifies the input file and ignores input_file argument. Typically *.lcd.
