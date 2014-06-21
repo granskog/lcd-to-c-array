@@ -71,7 +71,7 @@ def setError(errType = 'Error', errDescription = ''):
     global _lastErrStr
     _lastErrStr = 'Error: {:s} {:s}'.format(errType, errDescription)
 
-def saveAsCHeader(fileName, outFileName = ''):
+def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True):
     try:
         tree = ET.parse(fileName)
     except IOError:
@@ -144,21 +144,22 @@ def saveAsCHeader(fileName, outFileName = ''):
             for bit in pixels[i]:
                 # Pixels are represented with a colour code, i.e.
                 # black (filled in non-inverted mode) is '0' and all other
-                # values are considered "background". The output is in LSB order.
-                byte >>= 1
-                byte |= 128 if bit == '0' else 0
+                # values are considered "background".
+                byte = byte>>1 if LSB else byte<<1
+                byte |= (128 if LSB else 1) if bit == '0' else 0
 
             pixels[i] = '0x{:02x}'.format(byte)
 
         # Rearrange the pixels in horizontal byte order instead of the vertical byte order
         # the GLCD Font Creator outputs. This is done by creating a matrix where each column is the vertical
         # pixels and then transposing that matrix (using zip()) and then flatten it to an array again.
-        byteArray = grouper(pixels, font['height']/8)
-        byteArray = zip(*byteArray)
-        # Flatten the array of tuples.
-        byteArray = [byte for vertBytes in byteArray for byte in vertBytes]
+        if horizByteOrder:
+            pixels = grouper(pixels, font['height']/8)
+            pixels = zip(*pixels)
+            # Flatten the array of tuples.
+            pixels = [byte for vertBytes in pixels for byte in vertBytes]
 
-        outChars.append((charNo, byteArray))
+        outChars.append((charNo, pixels))
 
     # Sort the chars so we aren't dependent on the order they appear in the XML file.
     outChars.sort()
@@ -198,13 +199,19 @@ _USAGE = """Usage:
 Options:
     -i input_file   Specifies the input file and ignores input_file argument. Typically *.lcd.
     -o output_file  Specifies the output filename. If omitted, defaults to "fontname_size.c".
-    -h, --help      Shows this message."""
+    -h, --help      Shows this message.
+    -l              Least significant bit first in bitmap. This is the default.
+    -m              Most significant bit first in bitmap. Default is LSB.
+    -z              Horizontal byte order of array in output file. This is the default.
+    -v              Vertical byte order of array in output file. Default is horizontal byte order."""
 
 if __name__ == '__main__':
     inputfile = ''
     outputfile = ''
+    hbyteorder = True
+    lsb = True
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hi:o:",["help"])
+        opts, args = getopt.getopt(sys.argv[1:],"hi:o:lmzv",["help, LSB, MSB"])
     except getopt.GetoptError:
         print _USAGE
         sys.exit(2)
@@ -212,10 +219,18 @@ if __name__ == '__main__':
         if opt == ('-h', '--help'):
             print _USAGE
             sys.exit()
-        elif opt in ("-i", "--ifile"):
+        elif opt in ("-i"):
             inputfile = arg
-        elif opt in ("-o", "--ofile"):
+        elif opt in ("-o"):
             outputfile = arg
+        elif opt in ("-l", "--LSB"):
+            lsb = True
+        elif opt in ("-m", "--MSB"):
+            lsb = False
+        elif opt in ("-z"):
+            hbyteorder = True
+        elif opt in ("-v"):
+            hbyteorder = False
     
     if inputfile == '':
         if len(args) == 1:
@@ -224,6 +239,6 @@ if __name__ == '__main__':
             print _USAGE
             sys.exit(2)
 
-    if saveAsCHeader(inputfile, outputfile) != 0:
+    if saveAsCHeader(inputfile, outputfile, lsb, hbyteorder) != 0:
         print _lastErrStr
         sys.exit(2);
