@@ -29,7 +29,7 @@
 # SOFTWARE.
 
 import sys
-import os
+import StringIO
 import xml.etree.ElementTree as ET
 from itertools import izip_longest
 
@@ -98,8 +98,11 @@ def saveAsCHeader(fileName):
             setError(_ERR_INVALID_FILE_FORMAT, 'Font size parameter is invalid: {width:d}:{height:d} (width:height).'.format(**font))
             return 1
 
-        outFile = open('{name:s}_{width:d}x{height:d}'.format(**font) + _CFILETYPE, 'w')
-        outFile.write(_CFONTSTART.format(**font))
+        # Create a string buffer to write to. Doing it this way we don't overwrite
+        # any previously created files if we find the input file being invalid
+        # later on.
+        out = StringIO.StringIO()
+        out.write(_CFONTSTART.format(**font))
 
         chars = root.find('CHARS')
         if chars is None:
@@ -114,8 +117,7 @@ def saveAsCHeader(fileName):
             charNo = char.get('CODE')
             if pixels is None or charNo is None:
                 setError(_ERR_INVALID_FILE_FORMAT, 'Missing character parameters.')
-                outFile.close()
-                os.remove(outFile.name)
+                out.close()
                 return 1
 
             charNo = int(charNo)
@@ -124,8 +126,7 @@ def saveAsCHeader(fileName):
             # Validate pixel data for file.
             if len(pixels) != font['width']*(font['height']):
                 setError(_ERR_INVALID_FILE_FORMAT, 'Error: Invalid file format. Missmatch in pixel length for char "{:s}"'.format(charStr))
-                outFile.close()
-                os.remove(outFile.name)
+                out.close()
                 return 1
 
             pixels = grouper(pixels, 8)
@@ -156,18 +157,22 @@ def saveAsCHeader(fileName):
                 font['toChar'] != outChars[len(outChars)-1][0] or
                 len(outChars) != font['toChar'] - font['fromChar'] + 1):
             setError(_ERR_INVALID_FILE_FORMAT, 'Misaligned character array.')
-            outFile.close()
-            os.remove(outFile.name)
+            out.close()
             return 1       
 
         # Print the character array to the output file formatted as a c-array.
         for char in outChars:
             charNo, bytes = char
-            outFile.write(_CFONTARRAYITEM.format(','.join(bytes)))
-            outFile.write(_CFONTARRAYITEMCOMMENT.format(getChar(charNo)))
+            out.write(_CFONTARRAYITEM.format(','.join(bytes)))
+            out.write(_CFONTARRAYITEMCOMMENT.format(getChar(charNo)))
 
-        outFile.write(_CFONTEND)
+        out.write(_CFONTEND)
+
+        # Flush content of memorybuffer to file.
+        outFile = open('{name:s}_{width:d}x{height:d}'.format(**font) + _CFILETYPE, 'w')
+        outFile.write(out.getvalue())
         outFile.close()
+        out.close()
         return 0
 
     except IOError:
