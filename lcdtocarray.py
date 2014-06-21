@@ -56,6 +56,8 @@ _CFONTSTART = """/*
 static const uint8_t {name:s}_{width:d}x{height:d}[] PROGMEM =
 {{
 """
+_CFONTARRAYITEM = '     {:s},'
+_CFONTARRAYITEMCOMMENT = ' // {:s}\n'
 _CFONTEND = '};\n'
 _CFILETYPE = '.c'
 
@@ -103,19 +105,20 @@ def saveAsCHeader(fileName):
         if chars is None:
             chars = []
 
+        outChars = []
         for char in chars:
             # Validate data in file. If no pixels are present in the XML file or no information of which character it is
             # abort the whole operation, because a missing ASCII character or uncertain char order will make a char array
             # have undefined offsets. Rendering the output useless.
             pixels = char.get('PIXELS')
-            charStr = char.get('CODE')
-            if pixels is None or charStr is None:
+            charNo = char.get('CODE')
+            if pixels is None or charNo is None:
                 setError(_ERR_INVALID_FILE_FORMAT, 'Missing character parameters.')
                 outFile.close()
                 os.remove(outFile.name)
                 return 1
 
-            charStr = getChar(int(charStr))
+            charNo = int(charNo)
             pixels = pixels.split(',')
 
             # Validate pixel data for file.
@@ -143,8 +146,25 @@ def saveAsCHeader(fileName):
             # Flatten the array of tuples.
             byteArray = [byte for vertBytes in byteArray for byte in vertBytes]
 
-            outFile.write('     {:s},'.format(','.join(byteArray)))
-            outFile.write(' // {:s}\n'.format(charStr))
+            outChars.append((charNo, byteArray))
+
+        # Sort the chars so we aren't dependent on the order they appear in the XML file.
+        outChars.sort()
+
+        # Validate that the character array is correct. A misaligned array will be useless in the ouput
+        if (font['fromChar'] != outChars[0][0] or
+                font['toChar'] != outChars[len(outChars)-1][0] or
+                len(outChars) != font['toChar'] - font['fromChar'] + 1):
+            setError(_ERR_INVALID_FILE_FORMAT, 'Misaligned character array.')
+            outFile.close()
+            os.remove(outFile.name)
+            return 1       
+
+        # Print the character array to the output file formatted as a c-array.
+        for char in outChars:
+            charNo, bytes = char
+            outFile.write(_CFONTARRAYITEM.format(','.join(bytes)))
+            outFile.write(_CFONTARRAYITEMCOMMENT.format(getChar(charNo)))
 
         outFile.write(_CFONTEND)
         outFile.close()
