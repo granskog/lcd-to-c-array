@@ -141,7 +141,9 @@ def saveAsCHeader(fileName):
 
                 pixels[i] = '0x{:02x}'.format(byte)
 
-            # Arrange pixels in vertical byte orientation.
+            # Rearrange the pixels in horizontal byte order instead of the vertical byte order
+            # the GLCD Font Creator outputs. This is done by creating a matrix where each column is the vertical
+            # pixels and then transposing that matrix (using zip()) and then flatten it to an array again.
             byteArray = grouper(pixels, font['height']/8)
             byteArray = zip(*byteArray)
             # Flatten the array of tuples.
