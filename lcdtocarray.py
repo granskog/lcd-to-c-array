@@ -31,15 +31,18 @@
 import sys, getopt
 import StringIO
 import xml.etree.ElementTree as ET
-from itertools import izip_longest
 
-def grouper(iterable, n, fillvalue=None):
+# Since we validate the input file to have correct number of pixels represented
+# and that they are in a multiple of eight, it's enough to use zip() function
+# to group our lists together.
+def _grouper(iterable, n):
     "Collect data into fixed-length chunks or blocks"
-    # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
+    # _grouper('ABCDEFG', 2) --> AB CD EF
+    # (Note missing 'G'. But we don't care, since our input data should be in correct multiples.)
     args = [iter(iterable)] * n
-    return list(izip_longest(fillvalue=fillvalue, *args))
+    return zip(*args)
 
-def getChar(ordVal):
+def _getChar(ordVal):
     if ordVal == ord(' '):
         return '<space>'
     elif ordVal == ord('\\'):
@@ -67,7 +70,7 @@ _ERR_INVALID_FILE_FORMAT = 'Invalid file format.'
 _ERR_IO = 'Unable to open file.'
 _lastErrStr = ''
 
-def setError(errType = 'Error', errDescription = ''):
+def _setError(errType = 'Error', errDescription = ''):
     global _lastErrStr
     _lastErrStr = 'Error: {:s} {:s}'.format(errType, errDescription)
 
@@ -75,10 +78,10 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
     try:
         tree = ET.parse(fileName)
     except IOError:
-        setError(_ERR_IO, 'Input file: "{:s}"."'.format(fileName))
+        _setError(_ERR_IO, 'Input file: "{:s}"."'.format(fileName))
         return 1
     except ET.ParseError:
-        setError(_ERR_INVALID_FILE_FORMAT, 'Unable to parse infile: {:s}.'.format(fileName))
+        _setError(_ERR_INVALID_FILE_FORMAT, 'Unable to parse infile: {:s}.'.format(fileName))
         return 1
 
     root = tree.getroot()
@@ -88,7 +91,7 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
     fontRange = root.find('RANGE')
 
     if fontSize is None or fontName is None or fontRange is None:
-        setError(_ERR_INVALID_FILE_FORMAT, 'Missing file parameters.')
+        _setError(_ERR_INVALID_FILE_FORMAT, 'Missing file parameters.')
         return 1
 
     font = {
@@ -100,11 +103,11 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
     }
 
     if font['height'] % 8 != 0:
-        setError(_ERR_INVALID_FILE_FORMAT, 'Font height not multiple of eight.')
+        _setError(_ERR_INVALID_FILE_FORMAT, 'Font height not multiple of eight.')
         return 1
 
     if font['height'] <= 0 or font['width'] <= 0:
-        setError(_ERR_INVALID_FILE_FORMAT, 'Font size parameter is invalid: {width:d}:{height:d} (width:height).'.format(**font))
+        _setError(_ERR_INVALID_FILE_FORMAT, 'Font size parameter is invalid: {width:d}:{height:d} (width:height).'.format(**font))
         return 1
 
     # Create a string buffer to write to. Doing it this way we don't overwrite
@@ -125,7 +128,7 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
         pixels = char.get('PIXELS')
         charNo = char.get('CODE')
         if pixels is None or charNo is None:
-            setError(_ERR_INVALID_FILE_FORMAT, 'Missing character parameters.')
+            _setError(_ERR_INVALID_FILE_FORMAT, 'Missing character parameters.')
             out.close()
             return 1
 
@@ -134,32 +137,32 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
 
         # Validate pixel data for file.
         if len(pixels) != font['width']*(font['height']):
-            setError(_ERR_INVALID_FILE_FORMAT, 'Error: Invalid file format. Missmatch in pixel length for char "{:s}"'.format(charStr))
+            _setError(_ERR_INVALID_FILE_FORMAT, 'Error: Invalid file format. Missmatch in pixel length for char "{:s}"'.format(charStr))
             out.close()
             return 1
 
-        pixels = grouper(pixels, 8)
-        for i in range(len(pixels)):
+        byteArray = []
+        for byteOfPixels in _grouper(pixels, 8):
             byte = 0
-            for bit in pixels[i]:
-                # Pixels are represented with a colour code, i.e.
-                # black (filled in non-inverted mode) is '0' and all other
-                # values are considered "background".
+            # Pixels are represented with a colour code, i.e.
+            # black (filled in non-inverted mode) is '0' and all other
+            # values are considered "background" (e.g. white is represented by'16777215').
+            for bit in byteOfPixels:
                 byte = byte>>1 if LSB else byte<<1
                 byte |= (128 if LSB else 1) if bit == '0' else 0
 
-            pixels[i] = '0x{:02x}'.format(byte)
+            byteArray.append('0x{:02x}'.format(byte))
 
         # Rearrange the pixels in horizontal byte order instead of the vertical byte order
         # the GLCD Font Creator outputs. This is done by creating a matrix where each column is the vertical
-        # pixels and then transposing that matrix (using zip()) and then flatten it to an array again.
+        # pixels, then transposing that matrix (using zip()) and flatten it to an array again.
         if horizByteOrder:
-            pixels = grouper(pixels, font['height']/8)
-            pixels = zip(*pixels)
+            byteArray = _grouper(byteArray, font['height']/8)
+            byteArray = zip(*byteArray)
             # Flatten the array of tuples.
-            pixels = [byte for vertBytes in pixels for byte in vertBytes]
+            byteArray = [byte for vertBytes in byteArray for byte in vertBytes]
 
-        outChars.append((charNo, pixels))
+        outChars.append((charNo, byteArray))
 
     # Sort the chars so we aren't dependent on the order they appear in the XML file.
     outChars.sort()
@@ -168,14 +171,14 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
     if (font['fromChar'] != outChars[0][0] or
             font['toChar'] != outChars[len(outChars)-1][0] or
             len(outChars) != font['toChar'] - font['fromChar'] + 1):
-        setError(_ERR_INVALID_FILE_FORMAT, 'Misaligned character array.')
+        _setError(_ERR_INVALID_FILE_FORMAT, 'Misaligned character array.')
         out.close()
         return 1       
 
     # Print the character array to the output file formatted as a c-array.
     for charNo, bytes in outChars:
         out.write(_CFONTARRAYITEM.format(','.join(bytes)))
-        out.write(_CFONTARRAYITEMCOMMENT.format(getChar(charNo)))
+        out.write(_CFONTARRAYITEMCOMMENT.format(_getChar(charNo)))
 
     out.write(_CFONTEND)
 
@@ -185,7 +188,7 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
     try:
         outFile = open(outFileName, 'w')
     except IOError:
-        setError(_ERR_IO, 'Output file: "{:s}"."'.format(outFileName))
+        _setError(_ERR_IO, 'Output file: "{:s}"."'.format(outFileName))
         out.close()
         return 1
 
