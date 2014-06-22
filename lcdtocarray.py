@@ -185,7 +185,7 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
 
     # Flush content of memorybuffer to file.
     if outFileName == '':
-        outFileName = '{name:s}_{width:d}x{height:d}.{filetype:s}'.format(filetype = _CFILETYPE, **font)
+        outFileName = '{name:s}_{width:d}x{height:d}.{filetype:s}'.format(filetype = _CFILETYPE, **font).replace(' ', '_')
     try:
         outFile = open(outFileName, 'w')
     except IOError:
