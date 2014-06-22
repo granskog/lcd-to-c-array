@@ -62,7 +62,7 @@ _CFONTSTART = """/*
 static const uint8_t {name:s}_{width:d}x{height:d}[] PROGMEM =
 {{
 """
-_CFONTARRAYITEM = '     {:s},'
+_CFONTARRAYITEM = '    {:s},'
 _CFONTARRAYITEMCOMMENT = ' // {:s}\n'
 _CFONTEND = '};\n'
 _CFILETYPE = 'c'
