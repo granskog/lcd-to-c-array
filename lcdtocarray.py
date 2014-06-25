@@ -51,7 +51,9 @@ def _getChar(ordVal):
         return '<delete>'
     return chr(ordVal)
 
-_CFONTSTART = """/*
+_CFONTSTART = """#include <stdint.h>
+#include <avr/pgmspace.h>
+/*
  * Font name:                {name:s}
  * Font size (width:height): {width:d}:{height:d} pixels
  * Start char:               0x{fromChar:2x}
