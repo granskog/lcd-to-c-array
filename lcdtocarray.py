@@ -154,7 +154,7 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
                 byte = byte>>1 if LSB else byte<<1
                 byte |= (128 if LSB else 1) if bit == '0' else 0
 
-            byteArray.append('0x{:02x}'.format(byte))
+            byteArray.append('0x' + '{:02x}'.format(byte).upper())
 
         # Rearrange the pixels in horizontal byte order instead of the vertical byte order
         # the GLCD Font Creator outputs. This is done by creating a matrix where each column is the vertical
