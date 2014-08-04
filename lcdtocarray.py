@@ -105,6 +105,8 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
         'toChar': int(fontRange.get('TO', '0'))
     }
 
+    font['name'] = font['name'].replace(' ', '_')
+
     if font['height'] % 8 != 0:
         _setError(_ERR_INVALID_FILE_FORMAT, 'Font height not multiple of eight.')
         return 1
