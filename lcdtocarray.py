@@ -73,6 +73,8 @@ _ERR_INVALID_FILE_FORMAT = 'Invalid file format.'
 _ERR_IO = 'Unable to open file.'
 _lastErrStr = ''
 
+_WARN_NON_POW_2 = ' -> Warning! Font {:s} not a power of two.'
+
 def _setError(errType = 'Error', errDescription = ''):
     global _lastErrStr
     _lastErrStr = 'Error: {:s} {:s}'.format(errType, errDescription)
@@ -107,9 +109,10 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
 
     font['name'] = font['name'].replace(' ', '_')
 
-    if font['height'] % 8 != 0:
-        _setError(_ERR_INVALID_FILE_FORMAT, 'Font height not multiple of eight.')
-        return 1
+    if (not horizByteOrder) and (font['height'] % 8 != 0):
+        print _WARN_NON_POW_2.format('height')
+    elif horizByteOrder and (font['width'] % 8 != 0):
+        print _WARN_NON_POW_2.format('width')
 
     if font['height'] <= 0 or font['width'] <= 0:
         _setError(_ERR_INVALID_FILE_FORMAT, 'Font size parameter is invalid: {width:d}:{height:d} (width:height).'.format(**font))
