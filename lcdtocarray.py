@@ -69,23 +69,13 @@ _CFONTARRAYITEMCOMMENT = ' // {:s}\n'
 _CFONTEND = '};\n'
 _CFILETYPE = 'c'
 
-_ERR_INVALID_FILE_FORMAT = 'Invalid file format.'
-_ERR_IO = 'Unable to open file.'
-_lastErrStr = ''
-
-def _setError(errType = 'Error', errDescription = ''):
-    global _lastErrStr
-    _lastErrStr = 'Error: {:s} {:s}'.format(errType, errDescription)
-
-def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True):
+def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True, horizontalBits = False):
     try:
         tree = ET.parse(fileName)
     except IOError:
-        _setError(_ERR_IO, 'Input file: "{:s}"."'.format(fileName))
-        return 1
+        return (1, 'Unable to open file: "{:s}"."'.format(fileName))
     except ET.ParseError:
-        _setError(_ERR_INVALID_FILE_FORMAT, 'Unable to parse infile: {:s}.'.format(fileName))
-        return 1
+        return (1, 'Invalid file format. Unable to parse infile: {:s}.'.format(fileName))
 
     root = tree.getroot()
 
@@ -94,8 +84,7 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
     fontRange = root.find('RANGE')
 
     if fontSize is None or fontName is None or fontRange is None:
-        _setError(_ERR_INVALID_FILE_FORMAT, 'Missing file parameters.')
-        return 1
+        return (1, 'Invalid file format. Missing file parameters.')
 
     font = {
         'height': int(fontSize.get('HEIGHT', '0')),
@@ -108,12 +97,10 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
     font['name'] = font['name'].replace(' ', '_')
 
     if font['height'] % 8 != 0:
-        _setError(_ERR_INVALID_FILE_FORMAT, 'Font height not multiple of eight.')
-        return 1
+        return (1, 'Invalid file format. Font height not multiple of eight.')
 
     if font['height'] <= 0 or font['width'] <= 0:
-        _setError(_ERR_INVALID_FILE_FORMAT, 'Font size parameter is invalid: {width:d}:{height:d} (width:height).'.format(**font))
-        return 1
+        return (1, 'Invalid file format. Font size parameter is invalid: {width:d}:{height:d} (width:height).'.format(**font))
 
     # Create a string buffer to write to. Doing it this way we don't overwrite
     # any previously created files if we find the input file being invalid
@@ -133,18 +120,16 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
         pixels = char.get('PIXELS')
         charNo = char.get('CODE')
         if pixels is None or charNo is None:
-            _setError(_ERR_INVALID_FILE_FORMAT, 'Missing character parameters.')
             out.close()
-            return 1
+            return (1, _ERR_INVALID_FILE_FORMAT, 'Missing character parameters.')
 
         charNo = int(charNo)
         pixels = pixels.split(',')
 
         # Validate pixel data for file.
         if len(pixels) != font['width']*(font['height']):
-            _setError(_ERR_INVALID_FILE_FORMAT, 'Error: Invalid file format. Missmatch in pixel length for char "{:s}"'.format(charStr))
             out.close()
-            return 1
+            return (1, 'Invalid file format. Missmatch in pixel length for char "{:d}" ({:s}).'.format(charNo, _getChar(charNo)))
 
         byteArray = []
         for byteOfPixels in _grouper(pixels, 8):
@@ -176,9 +161,8 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
     if (font['fromChar'] != outChars[0][0] or
             font['toChar'] != outChars[len(outChars)-1][0] or
             len(outChars) != font['toChar'] - font['fromChar'] + 1):
-        _setError(_ERR_INVALID_FILE_FORMAT, 'Misaligned character array.')
         out.close()
-        return 1       
+        return (1, 'Invalid file format. Misaligned character array.')
 
     # Print the character array to the output file formatted as a c-array.
     for charNo, bytes in outChars:
@@ -193,14 +177,13 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True)
     try:
         outFile = open(outFileName, 'w')
     except IOError:
-        _setError(_ERR_IO, 'Output file: "{:s}"."'.format(outFileName))
         out.close()
-        return 1
+        return (1, 'Unable to create file: "{:s}"."'.format(outFileName))
 
     outFile.write(out.getvalue())
     outFile.close()
     out.close()
-    return 0
+    return (0, '')
 
 _USAGE = """Usage:
     lcdtocarray.py [options] input_file
@@ -247,8 +230,9 @@ def main(argv):
             print _USAGE
             sys.exit(2)
 
-    if saveAsCHeader(inputfile, outputfile, lsb, hbyteorder) != 0:
-        print _lastErrStr
+    errCode, errMsg = saveAsCHeader(inputfile, outputfile, lsb, hbyteorder)
+    if errCode != 0:
+        print errMsg
         sys.exit(2);
 
 if __name__ == '__main__':
