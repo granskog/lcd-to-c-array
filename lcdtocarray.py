@@ -42,6 +42,16 @@ def _grouper(iterable, n):
     args = [iter(iterable)] * n
     return zip(*args)
 
+# Rearrange the pixels in horizontal byte order instead of the vertical byte order
+# the GLCD Font Creator outputs. This is done by creating a matrix where each column is the vertical
+# pixels, then transposing that matrix (using zip()) and flatten it to an array again.
+def _reArrange(values, n):
+    values = _grouper(values, n)
+    values = zip(*values)
+    # Flatten the array of tuples.
+    values = [piece for pieces in values for piece in pieces]
+    return values
+
 def _getChar(ordVal):
     if ordVal == ord(' '):
         return '<space>'
@@ -96,11 +106,14 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True,
 
     font['name'] = font['name'].replace(' ', '_')
 
-    if font['height'] % 8 != 0:
-        return (1, 'Invalid file format. Font height not multiple of eight.')
-
     if font['height'] <= 0 or font['width'] <= 0:
         return (1, 'Invalid file format. Font size parameter is invalid: {width:d}:{height:d} (width:height).'.format(**font))
+
+    if horizontalBits and font['width']  % 8 != 0:
+        return (1, 'Invalid file format. Font width not multiple of eight.')
+
+    if not horizontalBits and font['height'] % 8 != 0:
+        return (1, 'Invalid file format. Font height not multiple of eight.')
 
     # Create a string buffer to write to. Doing it this way we don't overwrite
     # any previously created files if we find the input file being invalid
@@ -132,6 +145,10 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True,
             return (1, 'Invalid file format. Missmatch in pixel length for char "{:d}" ({:s}).'.format(charNo, _getChar(charNo)))
 
         byteArray = []
+
+        if horizontalBits:
+            pixels = _reArrange(pixels, font['height'])
+
         for byteOfPixels in _grouper(pixels, 8):
             byte = 0
             # Pixels are represented with a colour code, i.e.
@@ -143,14 +160,8 @@ def saveAsCHeader(fileName, outFileName = '', LSB = True, horizByteOrder = True,
 
             byteArray.append('0x' + '{:02x}'.format(byte).upper())
 
-        # Rearrange the pixels in horizontal byte order instead of the vertical byte order
-        # the GLCD Font Creator outputs. This is done by creating a matrix where each column is the vertical
-        # pixels, then transposing that matrix (using zip()) and flatten it to an array again.
-        if horizByteOrder:
-            byteArray = _grouper(byteArray, font['height']/8)
-            byteArray = zip(*byteArray)
-            # Flatten the array of tuples.
-            byteArray = [byte for vertBytes in byteArray for byte in vertBytes]
+        if horizByteOrder and not horizontalBits:
+            byteArray = _reArrange(byteArray, font['height']/8)
 
         outChars.append((charNo, byteArray))
 
@@ -191,18 +202,20 @@ Options:
     -i input_file   Specifies the input file and ignores input_file argument. Typically *.lcd.
     -o output_file  Specifies the output filename. If omitted, defaults to "fontname_size.c".
     -h, --help      Shows this message.
-    -l              Least significant bit first in bitmap. This is the default.
-    -m              Most significant bit first in bitmap. Default is LSB.
+    -l, --LSB       Least significant bit first in bitmap. This is the default.
+    -m, --MSB       Most significant bit first in bitmap. Default is LSB.
     -z              Horizontal byte order of array in output file. This is the default.
-    -v              Vertical byte order of array in output file. Default is horizontal byte order."""
+    -v              Vertical byte order of array in output file. Default is horizontal byte order.
+    -H              Create bytes from horizontally aligned bits in the bitmap. Overrides -z & -v options."""
     
 def main(argv):
     inputfile = ''
     outputfile = ''
     hbyteorder = True
     lsb = True
+    hrzBits = False
     try:
-        opts, args = getopt.getopt(argv, "hi:o:lmzv",["help, LSB, MSB"])
+        opts, args = getopt.getopt(argv, "hi:o:lmzvH",["help, LSB, MSB"])
     except getopt.GetoptError:
         print _USAGE
         sys.exit(2)
@@ -222,6 +235,8 @@ def main(argv):
             hbyteorder = True
         elif opt in ("-v"):
             hbyteorder = False
+        elif opt in ("-H"):
+            hrzBits = True
     
     if inputfile == '':
         if len(args) == 1:
@@ -230,7 +245,7 @@ def main(argv):
             print _USAGE
             sys.exit(2)
 
-    errCode, errMsg = saveAsCHeader(inputfile, outputfile, lsb, hbyteorder)
+    errCode, errMsg = saveAsCHeader(inputfile, outputfile, lsb, hbyteorder, hrzBits)
     if errCode != 0:
         print errMsg
         sys.exit(2);
